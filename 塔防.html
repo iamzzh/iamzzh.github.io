@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tower Defense Game</title>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    #gameCanvas {
+        background-color: #f0f0f0;
+        display: block;
+        margin: 0 auto;
+    }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="400" height="800"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Player
+        const player = {
+            bullets: [],
+            level: 1,
+            experience: 0,
+            experienceNeeded: 20,
+            x: canvas.width / 2,
+            y: canvas.height - 50,
+            width: 20,
+            height: 20,
+            color: 'blue',
+            attack: 50, // Initial attack
+        };
+
+        // Update player level and experience
+	function updatePlayer() {
+	if (player.experience >= player.experienceNeeded) {
+		// Player levels up
+		player.level++;
+		player.experience -= player.experienceNeeded;
+		player.experienceNeeded = 20;
+		player.attack++; // Increase attack by 1 on level up
+
+		// Display options for player enhancement
+		const enhancementOption = prompt("Choose an enhancement option:\n1. Increase attack by 20%\n2. Increase attack by 40%\n3. Increase attack by 60%\n4. Add an extra bullet with 100ms delay\n5. Add an extra bullet with 5-degree deviation\n6. Increase bullet pierce count by 1");
+
+		// Handle player's choice for enhancement
+		switch (enhancementOption) {
+		case "1":
+			player.attack = Math.ceil(player.attack * 1.2); // Increase attack by 20%
+			break;
+		case "2":
+			player.attack = Math.ceil(player.attack * 1.4); // Increase attack by 40%
+			break;
+		case "3":
+			player.attack = Math.ceil(player.attack * 1.6); // Increase attack by 60%
+			break;
+		// Add cases for other enhancement options
+		case "4":
+			const currentBullet = player.bullets[player.bullets.length - 1]; // Get the last bullet
+			const newBullet = {
+			x: currentBullet.x, // Same x position as the last bullet
+			y: currentBullet.y, // Same y position as the last bullet
+			direction: currentBullet.direction, // Same direction as the last bullet
+			timestamp: Date.now() + 100, // 100ms delay
+			};
+			player.bullets.push(newBullet); // Add the new bullet
+			break;
+		default:
+			break;
+		}
+	}
+	}
+
+        // Bullets
+        let bullets = [];
+
+        // Enemies
+        let enemies = [];
+
+        // Enemy types
+        const enemyTypes = [
+            { type: 'normal', color: 'green', width: 20, height: 20, health: 60, exp: 1 },
+            { type: 'strong', color: 'orange', width: 30, height: 30, health: 200, exp: 2  },
+            { type: 'fast', color: 'red', width: 15, height: 15, health: 60, exp: 1  }
+        ];
+
+        // Auto shoot interval
+        setInterval(() => {
+            const closestEnemy = findClosestEnemy(player.x, player.y);
+            if (closestEnemy) {
+                const angle = Math.atan2(closestEnemy.y - player.y, closestEnemy.x - player.x);
+                const velocity = 30;
+                const bullet = {
+                    x: player.x,
+                    y: player.y,
+                    radius: 5,
+                    color: 'red',
+                    velocityX: Math.cos(angle) * velocity,
+                    velocityY: Math.sin(angle) * velocity,
+                    targetEnemy: closestEnemy
+                };
+                bullets.push(bullet);
+            }
+        }, 1000);
+
+        // Find closest enemy to the given coordinates
+        function findClosestEnemy(x, y) {
+            let closestEnemy = null;
+            let closestDistance = Infinity;
+
+            enemies.forEach(enemy => {
+                const distance = Math.hypot(x - enemy.x, y - enemy.y);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestEnemy = enemy;
+                }
+            });
+
+            return closestEnemy;
+        }
+
+        // Game loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x - player.width / 2, player.y - player.height / 2, player.width, player.height);
+
+            // Draw experience bar
+            ctx.fillStyle = 'yellow';
+            ctx.fillRect(10, 10, (player.experience / player.experienceNeeded) * (canvas.width - 20), 10);
+
+            // Draw experience text
+            ctx.fillStyle = 'black';
+            ctx.fillText(`Exp: ${player.experience} / ${player.experienceNeeded}`, 10, 30);
+
+            // Draw level
+            ctx.fillStyle = 'black';
+            ctx.fillText(`Level: ${player.level}`, 10, 50);
+
+            // Draw bullets
+            bullets.forEach((bullet, index) => {
+                ctx.fillStyle = bullet.color;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                bullet.x += bullet.velocityX;
+                bullet.y += bullet.velocityY;
+
+                // Check for collision with target enemy
+		// Check for collision with target enemy
+		const distanceToTarget = Math.hypot(bullet.x - bullet.targetEnemy.x, bullet.y - bullet.targetEnemy.y);
+		if (distanceToTarget < bullet.targetEnemy.width / 2) {
+		bullet.targetEnemy.health -= player.attack; // Monster takes damage equal to player's attack
+		if (bullet.targetEnemy.health <= 0) {
+			// Show death effect
+			ctx.fillStyle = 'black';
+			ctx.fillRect(bullet.targetEnemy.x - bullet.targetEnemy.width / 2, bullet.targetEnemy.y - bullet.targetEnemy.height / 2, bullet.targetEnemy.width, bullet.targetEnemy.height);
+			setTimeout(() => {
+			const enemyType = enemyTypes.find(type => type.color === bullet.targetEnemy.color);
+			if (enemyType) {
+				console.log("add exp:", enemyType.exp);
+				player.experience += enemyType.exp; // Gain experience equal to enemy's exp
+				updatePlayer(); // Check for level up
+			}
+			enemies.splice(enemies.indexOf(bullet.targetEnemy), 1);
+			}, 500); // Delay removal for effect
+		}
+		bullets.splice(index, 1);
+		}
+
+
+                // Remove bullets that go out of bounds
+                if (bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(index, 1);
+                }
+            });
+
+            // Draw enemies
+            enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x - enemy.width / 2, enemy.y - enemy.height / 2, enemy.width, enemy.height);
+
+                // Move enemies downwards (speed reduced by half)
+                enemy.y += 0.3;
+
+                // Draw health bar
+                ctx.fillStyle = 'red';
+                ctx.fillRect(enemy.x - enemy.width / 2, enemy.y - enemy.height / 2 - 10, enemy.width, 5);
+                ctx.fillStyle = 'green';
+                ctx.fillRect(enemy.x - enemy.width / 2, enemy.y - enemy.height / 2 - 10, enemy.width * (enemy.health / enemyTypes.find(type => type.color === enemy.color).health), 5);
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize enemies
+        function spawnEnemy() {
+            const randomType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+            const enemy = {
+                x: Math.random() * canvas.width,
+                y: 0,
+                width: randomType.width,
+                height: randomType.height,
+                color: randomType.color,
+                health: randomType.health
+            };
+            enemies.push(enemy);
+        }
+
+        setInterval(spawnEnemy, 1000);
+
+        gameLoop();
+    </script>
+
+</body>
+</html>
